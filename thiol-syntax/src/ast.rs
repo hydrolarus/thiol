@@ -44,6 +44,15 @@ pub enum Item {
     Function(Loc<Function>),
     Consts(Loc<Consts>),
     Types(Loc<Types>),
+    Program(Loc<Program>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub name: Loc<Identifier>,
+    pub inputs: Vec<Loc<VariableDef>>,
+    pub outputs: Vec<Loc<VariableDef>>,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone)]

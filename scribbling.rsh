@@ -28,7 +28,7 @@ const
 function to_linear_depth(depth: float) returns float
 begin
     var z_n: float := 2 * depth - 1;
-    result := 2 * Z_NEAR * Z_FAR / (Z_FAR + Z_NEAR - z_n * (Z_FAR - Z_NEAR))
+    result := 2 * Z_NEAR * Z_FAR / (Z_FAR + Z_NEAR - z_n * (Z_FAR - Z_NEAR));
 end
 
 

@@ -42,6 +42,37 @@ peg::parser! {
         /   types:types() {
                 ast::Item::Types(types)
             }
+        /   prog:program() {
+                ast::Item::Program(prog)
+            }
+
+        //
+        // Program
+        //
+        rule program() -> Loc<ast::Program>
+        =
+            [tok!(TK::Program, start)] name:identifier()
+                inputs:program_inputs()?
+                outputs:program_outputs()?
+            [tok!(TK::Begin)]
+                body:block()
+            [tok!(TK::End, end)] {
+                Loc::new(
+                    start.merge(end),
+                    ast::Program {
+                        name,
+                        inputs: inputs.unwrap_or_default(),
+                        outputs: outputs.unwrap_or_default(),
+                        body,
+                    }
+                )
+            }
+
+        rule program_inputs() -> Vec<Loc<ast::VariableDef>>
+        = [tok!(TK::Input)] vars:variable_def()* { vars }
+
+        rule program_outputs() -> Vec<Loc<ast::VariableDef>>
+        = [tok!(TK::Output)] vars:variable_def()* { vars }
 
         //
         // function
@@ -703,7 +734,7 @@ mod tests {
 
     #[test]
     fn expr_cast() {
-        let ast = check_expr_parses("x as float4 is point");
+        let ast = check_expr_parses("x as float4 is Point");
         let printed = format!("{:?}", ast);
 
         assert!(printed.contains("As"));
@@ -748,7 +779,7 @@ mod tests {
 
     #[test]
     fn type_generic() {
-        let t = check_type_parses("Texture<float4 is point in WorldSpace>");
+        let t = check_type_parses("Texture<float4 is Point in WorldSpace>");
         let printed = format!("{:?}", t);
 
         assert!(printed.contains("Texture"));
@@ -928,47 +959,47 @@ end
 
 
 
-// program fragment
-// input
-//     [Position]
-//     frag_coord: float4;
-// 
-//     [Location(0)]
-//     water_screen_pos: float2;
-//     [Location(1)]
-//     fresnel: float;
-//     [Location(2)]
-//     light: float3;
-// output
-//     [Location(0)]
-//     colour: float4;
-// begin
-//     var reflection_colour: float3;
-//     reflection_colour := REFLECTION.sample(COLOUR_SAMPLER, water_screen_pos).xyz;
-//     
-//     var pixel_depth: float := to_linear_depth(frag_coord.z);
-//     
-//     var terrain_data: float4;
-//     terrain_data := TERRAIN_DEPTH_TEX.sample(
-//         sampler: COLOUR_SAMPLER,
-//         coord: frag_coord.xy / float2(UNIFORMS.time_size_width.w, UNIFORMS.viewport_height),
-//     );
-//     var terrain_depth: float := to_linear_depth(terrain_data.r);
-//     
-//     var dist: float := terrain_depth - pixel_depth;
-//     var clamped: float := smoothstep(lower: 0, upper: 1.5, value: dist).pow(4.8);
-//     
-//     colour.a := clamped * (1 - fresnel);
-//     
-//     var final_colour: float3 := light + reflection_colour;
-//     var depth_colour: float3 := mix(
-//         start: final_colour,
-//         end_: water_colour,
-//         value: smoothstep(lower: 1, upper: 5, value: dist) * 2,
-//     );
-//     
-//     colour.xyz := depth_colour;
-// end
+program fragment
+input
+    [Position]
+    frag_coord: float4;
+
+    [Location(0)]
+    water_screen_pos: float2;
+    [Location(1)]
+    fresnel: float;
+    [Location(2)]
+    light: float3;
+output
+    [Location(0)]
+    colour: float4;
+begin
+    var reflection_colour: float3;
+    reflection_colour := REFLECTION.sample(COLOUR_SAMPLER, water_screen_pos).xyz;
+    
+    var pixel_depth: float := to_linear_depth(frag_coord.z);
+    
+    var terrain_data: float4;
+    terrain_data := TERRAIN_DEPTH_TEX.sample(
+        sampler: COLOUR_SAMPLER,
+        coord: frag_coord.xy / float2(UNIFORMS.time_size_width.w, UNIFORMS.viewport_height),
+    );
+    var terrain_depth: float := to_linear_depth(terrain_data.r);
+    
+    var dist: float := terrain_depth - pixel_depth;
+    var clamped: float := smoothstep(lower: 0, upper: 1.5, value: dist).pow(4.8);
+    
+    colour.a := clamped * (1 - fresnel);
+    
+    var final_colour: float3 := light + reflection_colour;
+    var depth_colour: float3 := mix(
+        start: final_colour,
+        end_: water_colour,
+        value: smoothstep(lower: 1, upper: 5, value: dist) * 2,
+    );
+    
+    colour.xyz := depth_colour;
+end
         "#;
 
         check_file_parses(src);

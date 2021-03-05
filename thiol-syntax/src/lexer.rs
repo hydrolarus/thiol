@@ -32,11 +32,11 @@ pub enum TokenKind {
     #[token("downto")]
     DownTo,
 
-    #[token("point")]
+    #[token("Point")]
     Point,
-    #[token("vector")]
+    #[token("Vector")]
     Vector,
-    #[token("colour")]
+    #[token("Colour")]
     Colour,
 
     #[token("function")]
