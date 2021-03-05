@@ -3,9 +3,68 @@ use crate::Loc;
 pub type Identifier = String;
 
 #[derive(Debug, Clone)]
+pub struct File {
+    pub items: Vec<Item>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: Loc<Identifier>,
+    pub args: Vec<(Loc<Identifier>, Loc<TypeReference>)>,
+    pub ret_type: Loc<TypeReference>,
+
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub struct Consts {
+    pub vars: Vec<Loc<VariableDef>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Types {
+    pub types: Vec<Loc<TypeDefinition>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeDefinition {
+    pub name: Loc<Identifier>,
+    pub generics: Vec<Loc<Identifier>>,
+    pub rhs: Loc<TypeDefinitionRhs>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeDefinitionRhs {
+    Alias(TypeReference),
+    Record { fields: Vec<Loc<VariableDef>> },
+}
+
+#[derive(Debug, Clone)]
+pub enum Item {
+    Function(Loc<Function>),
+    Consts(Loc<Consts>),
+    Types(Loc<Types>),
+}
+
+#[derive(Debug, Clone)]
+pub struct VariableDef {
+    pub attributes: Vec<Loc<Attribute>>,
+    pub name: Loc<Identifier>,
+    pub type_: Loc<TypeReference>,
+    pub rhs: Option<Loc<Expression>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub name: Loc<Identifier>,
+    pub args: Vec<(Option<Loc<Identifier>>, Loc<Expression>)>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Literal(Literal),
     Variable(Identifier),
+    PrimitiveTypeConstructor(PrimitiveType),
     Call {
         base: Box<Loc<Expression>>,
         args: Vec<(Option<Loc<Identifier>>, Loc<Expression>)>,

@@ -21,6 +21,157 @@ peg::parser! {
     grammar parser() for [Token] {
 
         //
+        // file and item
+        //
+
+        pub rule file() -> ast::File
+        = items:item()* {
+            ast::File {
+                items,
+            }
+        }
+
+        rule item() -> ast::Item
+        =
+            func:function() {
+                ast::Item::Function(func)
+            }
+        /   consts:consts() {
+                ast::Item::Consts(consts)
+            }
+        /   types:types() {
+                ast::Item::Types(types)
+            }
+
+        //
+        // function
+        //
+
+        pub rule function() -> Loc<ast::Function>
+        =
+            [tok!(TK::Function, start)] name:identifier() [tok!(TK::ParenOpen)]
+                args:sep_trailing(<function_arg()>, <[tok!(TK::Comma)]>)
+            [tok!(TK::ParenClose)] [tok!(TK::Returns)] ret_ty:type_reference()
+            [tok!(TK::Begin)]
+                body:block()
+            [tok!(TK::End, end)] {
+                Loc::new(
+                    start.merge(end),
+                    ast::Function {
+                        name,
+                        args,
+                        ret_type: ret_ty,
+                        body,
+                    }
+                )
+            }
+
+        rule function_arg() -> (Loc<ast::Identifier>, Loc<ast::TypeReference>)
+        = name:identifier() [tok!(TK::Colon)] ty:type_reference() {
+            (name, ty)
+        }
+
+        //
+        // Consts
+        //
+        rule consts() -> Loc<ast::Consts>
+        = [tok!(TK::Const, start)] vars:variable_def()+ {
+            let end = vars.last().map(|l| l.loc).unwrap();
+            Loc::new(start.merge(end), ast::Consts { vars })
+        }
+
+        //
+        // Types
+        //
+        rule types() -> Loc<ast::Types>
+        = [tok!(TK::Type, start)] tys:type_definition()+ {
+            Loc::new(
+                start.merge(tys.last().unwrap().loc),
+                ast::Types {
+                    types: tys,
+                }
+            )
+        }
+
+        rule type_definition() -> Loc<ast::TypeDefinition>
+        =
+            name:identifier() [tok!(TK::LessThan)]
+                generics:sep_trailing(<identifier()>, <[tok!(TK::Comma)]>)
+            [tok!(TK::GreaterThan)] [tok!(TK::Equals)] rhs:type_def_rhs() {
+                Loc::new(
+                    name.loc.merge(rhs.loc),
+                    ast::TypeDefinition {
+                        name,
+                        generics,
+                        rhs,
+                    }
+                )
+            }
+        /   name:identifier() [tok!(TK::Equals)] rhs:type_def_rhs() {
+                Loc::new(
+                    name.loc.merge(rhs.loc),
+                    ast::TypeDefinition {
+                        name,
+                        generics: vec![],
+                        rhs,
+                    }
+                )
+            }
+
+        rule type_def_rhs() -> Loc<ast::TypeDefinitionRhs>
+        =
+            [tok!(TK::Record, start)]
+                fields:variable_def()*
+            [tok!(TK::End, end)] {
+                Loc::new(start.merge(end), ast::TypeDefinitionRhs::Record { fields })
+            }
+        /   ty_ref:type_reference() [tok!(TK::SemiColon, end)] {
+                Loc::new(ty_ref.loc.merge(end), ast::TypeDefinitionRhs::Alias(ty_ref.value))
+            }
+
+
+        rule variable_def() -> Loc<ast::VariableDef>
+        =
+            attrs:attribute()* name:identifier() [tok!(TK::Colon)]
+            type_:type_reference() [tok!(TK::SemiColon, end)] {
+                let start = attrs.first().map(|l| l.loc).unwrap_or(name.loc);
+                Loc::new(start.merge(end), ast::VariableDef {
+                    attributes: attrs,
+                    name,
+                    type_,
+                    rhs: None,
+                })
+            }
+        /   attrs:attribute()* name:identifier() [tok!(TK::Colon)]
+            type_:type_reference()
+            [tok!(TK::Becomes)] rhs:expression() [tok!(TK::SemiColon, end)] {
+                let start = attrs.first().map(|l| l.loc).unwrap_or(name.loc);
+                Loc::new(start.merge(end), ast::VariableDef {
+                    attributes: attrs,
+                    name,
+                    type_,
+                    rhs: Some(rhs),
+                })
+            }
+
+        rule attribute() -> Loc<ast::Attribute>
+        =
+            [tok!(TK::BracketOpen, start)] name:identifier() [tok!(TK::BracketClose, end)] {
+                Loc::new(start.merge(end), ast::Attribute { name, args: vec![] })
+            }
+        /   [tok!(TK::BracketOpen, start)] name:identifier() [tok!(TK::ParenOpen)]
+                args:arglist()
+            [tok!(TK::ParenClose)] [tok!(TK::BracketClose, end)] {
+                Loc::new(
+                    start.merge(end),
+                    ast::Attribute {
+                        name,
+                        args,
+                    }
+                )
+            }
+
+        //
         // Statement
         //
 
@@ -281,6 +432,12 @@ peg::parser! {
             [tok!(TK::ParenOpen)] inner:expression() [tok!(TK::ParenClose)] {
                 inner
             }
+            prim:type_primitive() {
+                Loc::new(
+                    prim.loc,
+                    ast::Expression::PrimitiveTypeConstructor(prim.value),
+                )
+            }
         }
 
         rule call_arg() -> (Option<Loc<ast::Identifier>>, Loc<ast::Expression>)
@@ -298,7 +455,7 @@ peg::parser! {
 
 
         //
-        // Types
+        // Type references
         //
 
         pub rule type_reference() -> Loc<ast::TypeReference>
@@ -359,28 +516,32 @@ peg::parser! {
 
         /   [tok!(TK::TyBoolVec(n), loc)] { Loc::new(loc, ast::PrimitiveType::BoolVec { components: n }) }
 
-        /   [tok!(TK::TyIntVec(n), loc)] annot:type_prim_vec_annot() {
+        /   [tok!(TK::TyIntVec(n), loc)] annot:type_prim_vec_annot()? {
+                let annot = annot.unwrap_or((None, None));
                 Loc::new(loc, ast::PrimitiveType::IntVec {
                     components: n,
                     vtype: annot.0,
                     space: annot.1,
                 })
             }
-        /   [tok!(TK::TyUIntVec(n), loc)] annot:type_prim_vec_annot() {
+        /   [tok!(TK::TyUIntVec(n), loc)] annot:type_prim_vec_annot()? {
+                let annot = annot.unwrap_or((None, None));
                 Loc::new(loc, ast::PrimitiveType::UIntVec {
                     components: n,
                     vtype: annot.0,
                     space: annot.1,
                 })
             }
-        /   [tok!(TK::TyFloatVec(n), loc)] annot:type_prim_vec_annot() {
+        /   [tok!(TK::TyFloatVec(n), loc)] annot:type_prim_vec_annot()? {
+                let annot = annot.unwrap_or((None, None));
                 Loc::new(loc, ast::PrimitiveType::FloatVec {
                     components: n,
                     vtype: annot.0,
                     space: annot.1,
                 })
             }
-        /   [tok!(TK::TyDoubleVec(n), loc)] annot:type_prim_vec_annot() {
+        /   [tok!(TK::TyDoubleVec(n), loc)] annot:type_prim_vec_annot()? {
+                let annot = annot.unwrap_or((None, None));
                 Loc::new(loc, ast::PrimitiveType::DoubleVec {
                     components: n,
                     vtype: annot.0,
@@ -395,6 +556,7 @@ peg::parser! {
                 })
             }
         /   [tok!(TK::TyDoubleMat((col, row)), loc)] annot:type_prim_mat_annot()? {
+
                 Loc::new(loc, ast::PrimitiveType::DoubleMat {
                     cols: col,
                     rows: row,
@@ -403,8 +565,7 @@ peg::parser! {
             }
 
         rule type_prim_vec_annot() -> (Option<Loc<ast::VecType>>, Option<Loc<ast::Identifier>>)
-        =
-            [tok!(TK::Is)] ty:type_vec_type() [tok!(TK::In)] space:identifier() {
+        =   [tok!(TK::Is)] ty:type_vec_type() [tok!(TK::In)] space:identifier() {
                 (Some(ty), Some(space))
             }
         /   [tok!(TK::Is)] ty:type_vec_type() {
@@ -565,6 +726,15 @@ mod tests {
     }
 
     #[test]
+    fn type_vec_no_annot() {
+        let t = check_type_parses("float3");
+        let printed = format!("{:?}", t);
+
+        assert!(printed.contains("FloatVec"));
+        assert!(printed.contains("components: VS3"));
+    }
+
+    #[test]
     fn type_mat_annot() {
         let t = check_type_parses("float4x4 from ObjectSpace to WorldSpace");
         let printed = format!("{:?}", t);
@@ -687,5 +857,120 @@ mod tests {
         end
         "#,
         );
+    }
+
+    fn check_file_parses(input: &str) -> ast::File {
+        let toks = tokenise(0, input).collect::<Vec<_>>();
+        match parser::file(&toks[..]) {
+            Ok(val) => val,
+            Err(err) => {
+                let idx = err.location;
+                let err_tok = &toks[idx];
+                panic!("Error at token {:?}: {}", err_tok, err.expected)
+            }
+        }
+    }
+
+    #[test]
+    fn test_function() {
+        check_file_parses(
+            r#"
+        function incr(x: int) returns int
+        begin
+            var tmp: int := x + 1;
+            // return tmp;
+            result := tmp;
+        end
+        "#,
+        );
+    }
+
+    #[test]
+    fn test_const_decl() {
+        check_file_parses("const TEST: float3 := float3(1, 1, 1);");
+    }
+
+    #[test]
+    fn test_parses_example_file() {
+        let src = r#"
+const
+    WATER_COLOUR: float3 := float3(0, 117 / 255, 242 / 255);
+    Z_NEAR: float := 10;
+    Z_FAR: float := 400;
+
+type
+    Uniforms = record
+        view: float4x4;
+        projection: float4x4;
+        time_size_width: float;
+        viewport_height: float;
+    end
+
+const
+    [Uniform(set: 0, binding: 0)]
+    UNIFORMS: Uniforms;
+
+    [Uniform(set: 0, binding: 1)]
+    REFLECTION: Texture<float4>;
+    
+    [Uniform(set: 0, binding: 2)]
+    TERRAIN_DEPTH_TEX: Texture<float4>;
+    
+    [Uniform(set: 0, binding: 3)]
+    COLOUR_SAMPLER: Sampler<float4>;
+
+
+function to_linear_depth(depth: float) returns float
+begin
+    var z_n: float := 2 * depth - 1;
+    result := 2 * Z_NEAR * Z_FAR / (Z_FAR + Z_NEAR - z_n * (Z_FAR - Z_NEAR));
+end
+
+
+
+// program fragment
+// input
+//     [Position]
+//     frag_coord: float4;
+// 
+//     [Location(0)]
+//     water_screen_pos: float2;
+//     [Location(1)]
+//     fresnel: float;
+//     [Location(2)]
+//     light: float3;
+// output
+//     [Location(0)]
+//     colour: float4;
+// begin
+//     var reflection_colour: float3;
+//     reflection_colour := REFLECTION.sample(COLOUR_SAMPLER, water_screen_pos).xyz;
+//     
+//     var pixel_depth: float := to_linear_depth(frag_coord.z);
+//     
+//     var terrain_data: float4;
+//     terrain_data := TERRAIN_DEPTH_TEX.sample(
+//         sampler: COLOUR_SAMPLER,
+//         coord: frag_coord.xy / float2(UNIFORMS.time_size_width.w, UNIFORMS.viewport_height),
+//     );
+//     var terrain_depth: float := to_linear_depth(terrain_data.r);
+//     
+//     var dist: float := terrain_depth - pixel_depth;
+//     var clamped: float := smoothstep(lower: 0, upper: 1.5, value: dist).pow(4.8);
+//     
+//     colour.a := clamped * (1 - fresnel);
+//     
+//     var final_colour: float3 := light + reflection_colour;
+//     var depth_colour: float3 := mix(
+//         start: final_colour,
+//         end_: water_colour,
+//         value: smoothstep(lower: 1, upper: 5, value: dist) * 2,
+//     );
+//     
+//     colour.xyz := depth_colour;
+// end
+        "#;
+
+        check_file_parses(src);
     }
 }
