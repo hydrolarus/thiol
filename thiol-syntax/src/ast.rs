@@ -59,6 +59,20 @@ pub enum Statement {
         branches: Vec<(Loc<Expression>, Block)>,
         else_: Option<Block>,
     },
+    For {
+        iter_name: Loc<Identifier>,
+        loop_type: ForLoopType,
+        from: Loc<Expression>,
+        to: Loc<Expression>,
+
+        body: Block,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ForLoopType {
+    Up,
+    Down,
 }
 
 #[derive(Debug, Clone)]

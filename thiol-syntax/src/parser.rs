@@ -107,6 +107,34 @@ peg::parser! {
                     }
                 )
             }
+        /   [tok!(TK::For, start)] iter:identifier() [tok!(TK::In)]
+                from:expression_atom() [tok!(TK::To)] to:expression_atom()
+            [tok!(TK::Do)] body:block() [tok!(TK::End, end)] {
+                Loc::new(
+                    start.merge(end),
+                    ast::Statement::For {
+                        iter_name: iter,
+                        loop_type: ast::ForLoopType::Up,
+                        from,
+                        to,
+                        body,
+                    }
+                )
+            }
+        /   [tok!(TK::For, start)] iter:identifier() [tok!(TK::In)]
+                from:expression_atom() [tok!(TK::DownTo)] to:expression_atom()
+            [tok!(TK::Do)] body:block() [tok!(TK::End, end)] {
+                Loc::new(
+                    start.merge(end),
+                    ast::Statement::For {
+                        iter_name: iter,
+                        loop_type: ast::ForLoopType::Down,
+                        from,
+                        to,
+                        body,
+                    }
+                )
+            }
 
         rule elseif_branch() -> (Loc<ast::Expression>, ast::Block)
         =
@@ -637,6 +665,25 @@ mod tests {
             return 0;
         elseif boop then
             return boop_factor;
+        end
+        "#,
+        );
+    }
+
+    #[test]
+    fn test_stmt_for_loop() {
+        check_statement_parses(
+            r#"
+        for i in 0 to 10 do
+            x := x + i;
+        end
+        "#,
+        );
+
+        check_statement_parses(
+            r#"
+        for i in 10 downto 0 do
+            x := x + i;
         end
         "#,
         );

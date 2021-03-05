@@ -29,6 +29,8 @@ pub enum TokenKind {
     To,
     #[token("as")]
     As,
+    #[token("downto")]
+    DownTo,
 
     #[token("point")]
     Point,
@@ -65,6 +67,11 @@ pub enum TokenKind {
     Else,
     #[token("elseif")]
     ElseIf,
+
+    #[token("for")]
+    For,
+    #[token("do")]
+    Do,
 
     #[token("returns")]
     Returns,
