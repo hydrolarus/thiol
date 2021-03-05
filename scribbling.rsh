@@ -12,16 +12,16 @@ type
     end
 
 const
-    [Uniform(set => 0, binding => 0)]
+    [Uniform(set: 0, binding: 0)]
     UNIFORMS: Uniforms;
 
-    [Uniform(set => 0, binding => 1)]
+    [Uniform(set: 0, binding: 1)]
     REFLECTION: Texture<float4>;
     
-    [Uniform(set => 0, binding => 2)]
+    [Uniform(set: 0, binding: 2)]
     TERRAIN_DEPTH_TEX: Texture<float4>;
     
-    [Uniform(set => 0, binding => 3)]
+    [Uniform(set: 0, binding: 3)]
     COLOUR_SAMPLER: Sampler<float4>;
 
 
@@ -55,8 +55,8 @@ begin
     
     var terrain_data: float4;
     terrain_data := TERRAIN_DEPTH_TEX.sample(
-        sampler => COLOUR_SAMPLER,
-        coord => frag_coord.xy / float2(UNIFORMS.time_size_width.w, UNIFORMS.viewport_height),
+        sampler: COLOUR_SAMPLER,
+        coord: frag_coord.xy / float2(UNIFORMS.time_size_width.w, UNIFORMS.viewport_height),
     );
     var terrain_depth: float := to_linear_depth(terrain_data.r);
     
@@ -67,9 +67,9 @@ begin
     
     var final_colour: float3 := light + reflection_colour;
     var depth_colour: float3 := mix(
-        start => final_colour,
-        end_ => water_colour,
-        value => smoothstep(lower => 1, upper => 5, value => dist) * 2,
+        start: final_colour,
+        end_: water_colour,
+        value: smoothstep(lower: 1, upper: 5, value: dist) * 2,
     );
     
     colour.xyz := depth_colour;

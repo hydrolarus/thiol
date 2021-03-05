@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use crate::{FileId, FileLocation, Loc};
+use crate::{ast::VecSize, FileId, FileLocation, Loc};
 
 #[derive(Debug, Clone, PartialEq, Logos)]
 pub enum TokenKind {
@@ -13,6 +13,27 @@ pub enum TokenKind {
     Type,
     #[token("record")]
     Record,
+
+    #[token("array")]
+    Array,
+
+    #[token("of")]
+    Of,
+    #[token("in")]
+    In,
+    #[token("is")]
+    Is,
+    #[token("from")]
+    From,
+    #[token("to")]
+    To,
+
+    #[token("point")]
+    Point,
+    #[token("vector")]
+    Vector,
+    #[token("colour")]
+    Colour,
 
     #[token("function")]
     Function,
@@ -34,6 +55,65 @@ pub enum TokenKind {
     Input,
     #[token("output")]
     Output,
+
+    // primitive types
+    #[token("bool")]
+    TyBool,
+    #[token("int")]
+    TyInt,
+    #[token("uint")]
+    TyUInt,
+    #[token("float")]
+    TyFloat,
+    #[token("double")]
+    TyDouble,
+
+    #[token("bool2", |_| VecSize::VS2)]
+    #[token("bool3", |_| VecSize::VS3)]
+    #[token("bool4", |_| VecSize::VS4)]
+    TyBoolVec(VecSize),
+
+    #[token("int2", |_| VecSize::VS2)]
+    #[token("int3", |_| VecSize::VS3)]
+    #[token("int4", |_| VecSize::VS4)]
+    TyIntVec(VecSize),
+
+    #[token("uint2", |_| VecSize::VS2)]
+    #[token("uint3", |_| VecSize::VS3)]
+    #[token("uint4", |_| VecSize::VS4)]
+    TyUIntVec(VecSize),
+
+    #[token("float2", |_| VecSize::VS2)]
+    #[token("float3", |_| VecSize::VS3)]
+    #[token("float4", |_| VecSize::VS4)]
+    TyFloatVec(VecSize),
+
+    #[token("double2", |_| VecSize::VS2)]
+    #[token("double3", |_| VecSize::VS3)]
+    #[token("double4", |_| VecSize::VS4)]
+    TyDoubleVec(VecSize),
+
+    #[token("float2x2", |_| { (VecSize::VS2, VecSize::VS2) })]
+    #[token("float2x3", |_| { (VecSize::VS2, VecSize::VS3) })]
+    #[token("float2x4", |_| { (VecSize::VS2, VecSize::VS4) })]
+    #[token("float3x2", |_| { (VecSize::VS3, VecSize::VS2) })]
+    #[token("float3x3", |_| { (VecSize::VS3, VecSize::VS3) })]
+    #[token("float3x4", |_| { (VecSize::VS3, VecSize::VS4) })]
+    #[token("float4x2", |_| { (VecSize::VS4, VecSize::VS2) })]
+    #[token("float4x3", |_| { (VecSize::VS4, VecSize::VS3) })]
+    #[token("float4x4", |_| { (VecSize::VS4, VecSize::VS4) })]
+    TyFloatMat((VecSize, VecSize)),
+
+    #[token("double2x2", |_| { (VecSize::VS2, VecSize::VS2) })]
+    #[token("double2x3", |_| { (VecSize::VS2, VecSize::VS3) })]
+    #[token("double2x4", |_| { (VecSize::VS2, VecSize::VS4) })]
+    #[token("double3x2", |_| { (VecSize::VS3, VecSize::VS2) })]
+    #[token("double3x3", |_| { (VecSize::VS3, VecSize::VS3) })]
+    #[token("double3x4", |_| { (VecSize::VS3, VecSize::VS4) })]
+    #[token("double4x2", |_| { (VecSize::VS4, VecSize::VS2) })]
+    #[token("double4x3", |_| { (VecSize::VS4, VecSize::VS3) })]
+    #[token("double4x4", |_| { (VecSize::VS4, VecSize::VS4) })]
+    TyDoubleMat((VecSize, VecSize)),
 
     #[regex(r"(\p{XID_Start}|_)(\p{XID_Continue}|')*", |lex| lex.slice().to_string())]
     Identifier(String),

@@ -117,8 +117,12 @@ peg::parser! {
                 )
             }
             --
-            [tok!(TK::Identifier(i), loc)] { Loc::new(loc, ast::Expression::Variable(i)) }
-            l:literal() { Loc::new(l.loc(), ast::Expression::Literal(l.value)) }
+            ident:identifier() {
+                Loc::new(ident.loc, ast::Expression::Variable(ident.value))
+            }
+            l:literal() {
+                Loc::new(l.loc, ast::Expression::Literal(l.value))
+            }
             [tok!(TK::ParenOpen)] inner:expression() [tok!(TK::ParenClose)] {
                 inner
             }
@@ -136,6 +140,113 @@ peg::parser! {
 
         rule arglist() -> Vec<(Option<Loc<ast::Identifier>>, Loc<ast::Expression>)>
         = args:sep_trailing(<call_arg()>, <[tok!(TK::Comma)]>)
+
+
+        //
+        // Types
+        //
+
+        rule type_reference() -> Loc<ast::TypeReference>
+        =
+            prim:type_primitive() {
+                Loc::new(prim.loc, ast::TypeReference::Primitive(prim))
+            }
+        /   [tok!(TK::Array, al)] [tok!(TK::BracketOpen)]
+                [tok!(TK::Integer(size), sl)]
+            [tok!(TK::BracketOpen)] [tok!(TK::Of)] ty:type_reference() {
+                Loc::new(
+                    al.merge(ty.loc),
+                    ast::TypeReference::Array {
+                        base: Box::new(ty),
+                        size: Loc::new(sl, size as usize),
+                    },
+                )
+            }
+        /   [tok!(TK::Array, al)] [tok!(TK::Of)] ty:type_reference() {
+                Loc::new(
+                    al.merge(ty.loc),
+                    ast::TypeReference::OpenArray {
+                        base: Box::new(ty),
+                    },
+                )
+            }
+        /   name:identifier() [tok!(TK::LessThan)]
+                gens:sep_trailing(<type_reference()>, <[tok!(TK::Comma)]>)
+            [tok!(TK::GreaterThan, end)] {
+                Loc::new(
+                    name.loc.merge(end),
+                    ast::TypeReference::Named {
+                        name,
+                        generics: gens,
+                    }
+                )
+            }
+        /   name:identifier() {
+                Loc::new(
+                    name.loc,
+                    ast::TypeReference::Named {
+                        name,
+                        generics: vec![],
+                    }
+                )
+            }
+
+        rule type_primitive() -> Loc<ast::PrimitiveType>
+        =
+            [tok!(TK::TyBool, loc)] { Loc::new(loc, ast::PrimitiveType::Bool) }
+        /   [tok!(TK::TyInt, loc)] { Loc::new(loc, ast::PrimitiveType::Int) }
+        /   [tok!(TK::TyUInt, loc)] { Loc::new(loc, ast::PrimitiveType::UInt) }
+        /   [tok!(TK::TyFloat, loc)] { Loc::new(loc, ast::PrimitiveType::Float) }
+        /   [tok!(TK::TyDouble, loc)] { Loc::new(loc, ast::PrimitiveType::Double) }
+
+        /   [tok!(TK::TyBoolVec(n), loc)] { Loc::new(loc, ast::PrimitiveType::BoolVec { components: n }) }
+
+        /   [tok!(TK::TyIntVec(n), loc)] annot:type_prim_vec_annot() {
+                Loc::new(loc, ast::PrimitiveType::IntVec {
+                    components: n,
+                    vtype: annot.0,
+                    space: annot.1,
+                })
+            }
+        /   [tok!(TK::TyUIntVec(n), loc)] annot:type_prim_vec_annot() {
+                Loc::new(loc, ast::PrimitiveType::UIntVec {
+                    components: n,
+                    vtype: annot.0,
+                    space: annot.1,
+                })
+            }
+        /   [tok!(TK::TyFloatVec(n), loc)] annot:type_prim_vec_annot() {
+                Loc::new(loc, ast::PrimitiveType::FloatVec {
+                    components: n,
+                    vtype: annot.0,
+                    space: annot.1,
+                })
+            }
+        /   [tok!(TK::TyDoubleVec(n), loc)] annot:type_prim_vec_annot() {
+                Loc::new(loc, ast::PrimitiveType::DoubleVec {
+                    components: n,
+                    vtype: annot.0,
+                    space: annot.1,
+                })
+            }
+        // TODO matrices
+
+        rule type_prim_vec_annot() -> (Option<Loc<ast::VecType>>, Option<Loc<ast::Identifier>>)
+        =
+            [tok!(TK::Is)] ty:type_vec_type() [tok!(TK::In)] space:identifier() {
+                (Some(ty), Some(space))
+            }
+        /   [tok!(TK::Is)] ty:type_vec_type() {
+                (Some(ty), None)
+            }
+        /   [tok!(TK::In)] space:identifier() {
+                (None, Some(space))
+            }
+
+        rule type_vec_type() -> Loc<ast::VecType>
+        = [tok!(TK::Point, loc)] { Loc::new(loc, ast::VecType::Point) }
+        / [tok!(TK::Vector, loc)] { Loc::new(loc, ast::VecType::Vector) }
+        / [tok!(TK::Colour, loc)] { Loc::new(loc, ast::VecType::Colour) }
 
         //
         // Terminals
