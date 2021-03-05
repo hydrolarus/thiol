@@ -31,14 +31,33 @@ pub enum Expression {
         base: Box<Loc<Expression>>,
         index: Box<Loc<Expression>>,
     },
+    As {
+        base: Box<Loc<Expression>>,
+        ty: Loc<TypeReference>,
+    },
 }
+
+pub type Block = Vec<Loc<Statement>>;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
+    Var {
+        name: Loc<Identifier>,
+        type_ref: Loc<TypeReference>,
+        rhs: Option<Loc<Expression>>,
+    },
     Becomes {
         // this needs to be checked to be a valid l-value
         lhs: Loc<Expression>,
         rhs: Loc<Expression>,
+    },
+    Return(Option<Loc<Expression>>),
+    Break,
+    Continue,
+    Branch {
+        // guaranteed to have length of at least 1
+        branches: Vec<(Loc<Expression>, Block)>,
+        else_: Option<Block>,
     },
 }
 

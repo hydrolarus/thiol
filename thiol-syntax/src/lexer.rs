@@ -27,6 +27,8 @@ pub enum TokenKind {
     From,
     #[token("to")]
     To,
+    #[token("as")]
+    As,
 
     #[token("point")]
     Point,
@@ -47,6 +49,22 @@ pub enum TokenKind {
     Begin,
     #[token("end")]
     End,
+
+    #[token("return")]
+    Return,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
+
+    #[token("if")]
+    If,
+    #[token("then")]
+    Then,
+    #[token("else")]
+    Else,
+    #[token("elseif")]
+    ElseIf,
 
     #[token("returns")]
     Returns,
