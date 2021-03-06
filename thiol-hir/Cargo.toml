@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2021 The thiol developers
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[package]
+name = "thiol-hir"
+version = "0.1.0"
+authors = ["tiatomee <tia-github@poto.cafe>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiol-syntax = { path = "../thiol-syntax" }
+
+id-arena = "2"

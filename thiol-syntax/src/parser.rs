@@ -251,27 +251,16 @@ peg::parser! {
 
         pub rule statement() -> Loc<ast::Statement>
         =
-            [tok!(TK::Var, start)] name:identifier() [tok!(TK::Colon)] ty:type_reference()
-            [tok!(TK::Becomes)] rhs:expression()
-            [tok!(TK::SemiColon, end)] {
+            [tok!(TK::Var, start)] var_def:variable_def() {
                 Loc::new(
-                    start.merge(end),
-                    ast::Statement::Var {
-                        name,
-                        type_ref: ty,
-                        rhs: Some(rhs),
-                    }
+                    start.merge(var_def.loc),
+                    ast::Statement::Var(var_def.value),
                 )
             }
-        /   [tok!(TK::Var, start)] name:identifier() [tok!(TK::Colon)] ty:type_reference()
-            [tok!(TK::SemiColon, end)] {
+        /   [tok!(TK::Var, start)] name:identifier() var_def:variable_def() {
                 Loc::new(
-                    start.merge(end),
-                    ast::Statement::Var {
-                        name,
-                        type_ref: ty,
-                        rhs: None,
-                    }
+                    start.merge(var_def.loc),
+                    ast::Statement::Var(var_def.value)
                 )
             }
             // expr-lhs := expr;

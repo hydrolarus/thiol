@@ -113,11 +113,7 @@ pub type Block = Vec<Loc<Statement>>;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Var {
-        name: Loc<Identifier>,
-        type_ref: Loc<TypeReference>,
-        rhs: Option<Loc<Expression>>,
-    },
+    Var(VariableDef),
     Becomes {
         // this needs to be checked to be a valid l-value
         lhs: Loc<Expression>,
