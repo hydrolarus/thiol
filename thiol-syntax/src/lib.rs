@@ -34,13 +34,3 @@ impl<T> Loc<T> {
         Self { loc, value }
     }
 }
-
-pub trait HasLoc {
-    fn loc(&self) -> FileLocation;
-}
-
-impl<T> HasLoc for Loc<T> {
-    fn loc(&self) -> FileLocation {
-        self.loc
-    }
-}

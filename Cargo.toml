@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "thiol-syntax"
+    "thiol-syntax",
+    "thiolc"
 ]

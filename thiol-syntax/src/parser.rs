@@ -1,9 +1,48 @@
 #![allow(clippy::redundant_closure_call)]
 
-use crate::lexer::{Token, TokenKind as TK};
-use crate::{HasLoc, Loc};
+use crate::{
+    lexer::{Token, TokenKind as TK},
+    FileId, Loc,
+};
 
 use crate::ast;
+
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub location: crate::FileLocation,
+    pub expected_tokens: Vec<String>,
+}
+
+pub fn parse_file(file_id: FileId, input: &str) -> Result<ast::File, ParseError> {
+    let toks = crate::lexer::tokenise(file_id, input).collect::<Vec<_>>();
+
+    fn extract_expected_token(s: &str) -> String {
+        s.trim_start_matches("[tok ! (TK :: ")
+            .split(|c: char| !c.is_alphanumeric())
+            .next()
+            .unwrap()
+            .to_string()
+    }
+
+    match parser::file(&toks) {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            let location = toks
+                .get(err.location)
+                .map(|t| t.loc)
+                .unwrap_or(crate::FileLocation {
+                    file: file_id,
+                    start: input.len(),
+                    end: input.len(),
+                });
+            let expected = err.expected.tokens().map(extract_expected_token).collect();
+            Err(ParseError {
+                location,
+                expected_tokens: expected,
+            })
+        }
+    }
+}
 
 macro_rules! tok {
     ($p:pat, $loc:ident) => {
@@ -25,7 +64,7 @@ peg::parser! {
         //
 
         pub rule file() -> ast::File
-        = items:item()* {
+        = items:item()* ![_] {
             ast::File {
                 items,
             }
@@ -234,7 +273,7 @@ peg::parser! {
             // expr-lhs := expr;
         /   lhs:expression_atom() [tok!(TK::Becomes)] rhs:expression() [tok!(TK::SemiColon, end)] {
                 Loc::new(
-                    lhs.loc().merge(end),
+                    lhs.loc.merge(end),
                     ast::Statement::Becomes {
                         lhs,
                         rhs,
@@ -337,69 +376,69 @@ peg::parser! {
 
             x:(@) [tok!(TK::Equals)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Eq, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::NotEquals)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Neq, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::LessThan)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Lt, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::LessThanEqual)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Lte, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::GreaterThan)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Gt, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::GreaterThanEqual)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Gte, args: Box::new([x, y]), },
                 )
             }
             --
             x:(@) [tok!(TK::Plus, opl)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Add, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::Minus, opl)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Sub, args: Box::new([x, y]), },
                 )
             }
             --
             x:(@) [tok!(TK::Star, opl)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Mul, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::Slash, opl)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Div, args: Box::new([x, y]), },
                 )
             }
             x:(@) [tok!(TK::Mod, opl)] y:@ {
                 Loc::new(
-                    x.loc().merge(y.loc()),
+                    x.loc.merge(y.loc),
                     ast::Expression::InfixOp { op: ast::InfixOp::Mod, args: Box::new([x, y]), },
                 )
             }
@@ -412,10 +451,10 @@ peg::parser! {
             }
             --
             [tok!(TK::Plus, opl)] arg:@ {
-                Loc::new(opl.merge(arg.loc()), ast::Expression::PrefixOp { op: ast::PrefixOp::Plus, expr: Box::new(arg) })
+                Loc::new(opl.merge(arg.loc), ast::Expression::PrefixOp { op: ast::PrefixOp::Plus, expr: Box::new(arg) })
             }
             [tok!(TK::Minus, opl)] arg:@ {
-                Loc::new(opl.merge(arg.loc()), ast::Expression::PrefixOp { op: ast::PrefixOp::Minus, expr: Box::new(arg) })
+                Loc::new(opl.merge(arg.loc), ast::Expression::PrefixOp { op: ast::PrefixOp::Minus, expr: Box::new(arg) })
             }
             --
             atom:expression_atom() { atom }
@@ -424,7 +463,7 @@ peg::parser! {
         rule expression_atom() -> Loc<ast::Expression> = precedence!{
             base:@ [tok!(TK::BracketOpen)] idx:expression() [tok!(TK::BracketClose, loc)]
             {
-                Loc::new(base.loc().merge(loc), ast::Expression::Index {
+                Loc::new(base.loc.merge(loc), ast::Expression::Index {
                     base: Box::new(base),
                     index: Box::new(idx),
                 })
@@ -433,7 +472,7 @@ peg::parser! {
             base:@ [tok!(TK::Dot)] name:identifier()
             [tok!(TK::ParenOpen)] args:arglist() [tok!(TK::ParenClose, loc)]
             {
-                Loc::new(base.loc().merge(loc), ast::Expression::DotCall {
+                Loc::new(base.loc.merge(loc), ast::Expression::DotCall {
                     base: Box::new(base),
                     name,
                     args,
@@ -441,7 +480,7 @@ peg::parser! {
             }
             --
             base:@ [tok!(TK::ParenOpen)] args:arglist() [tok!(TK::ParenClose, loc)] {
-                Loc::new(base.loc().merge(loc), ast::Expression::Call {
+                Loc::new(base.loc.merge(loc), ast::Expression::Call {
                     base: Box::new(base),
                     args,
                 })
@@ -449,7 +488,7 @@ peg::parser! {
             --
             base:@ [tok!(TK::Dot)] name:identifier() {
                 Loc::new(
-                    base.loc().merge(name.loc()),
+                    base.loc.merge(name.loc),
                     ast::Expression::Field { base: Box::new(base), name },
                 )
             }
