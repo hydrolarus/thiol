@@ -8,6 +8,17 @@ SPDX-License-Identifier: CC0-1.0
 
 A programming language that helps you write shader- and kernel-programs.
 
+**Status:**
+
+- [x] parsing to AST
+- [ ] convert to HIR and type check
+- [ ] code generation
+  - [ ] SPIR-V
+  - [ ] GLSL
+  - [ ] OpenCL
+- [ ] language server implementation
+
+
 ## License
 
 All code is licensed under the [EUPL-1.2 license](LICENSES/EUPL-1.2.txt).
