@@ -1,2 +1,6 @@
+# SPDX-FileCopyrightText: 2021 The thiol developers
+#
+# SPDX-License-Identifier: CC0-1.0
+
 /target
 Cargo.lock

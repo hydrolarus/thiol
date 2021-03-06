@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 The thiol developers
+//
+// SPDX-License-Identifier: EUPL-1.2
+
 use logos::Logos;
 
 use crate::{ast::VecSize, FileId, FileLocation, Loc};
