@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2021 The thiol developers
+#
+# SPDX-License-Identifier: CC0-1.0
+
 name: Rust
 
 on:
@@ -27,5 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - uses: actions/checkout@v2
+    
     - name: REUSE Compliance Check
       uses: fsfe/reuse-action@v1.1
