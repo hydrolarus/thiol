@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2021 The thiol developers
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: Rust
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Clippy
+      run: cargo clippy --verbose
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
+      
+  license-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: REUSE Compliance Check
+      uses: fsfe/reuse-action@v1.1
