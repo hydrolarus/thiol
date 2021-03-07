@@ -127,14 +127,12 @@ fn ast_lowering_error_to_diag(err: thiol_ast_lowering::Error) -> Diagnostic<File
                 .with_message("positional argument used after named argument")
                 .with_labels(vec![prim, other])
         }
-        Error::CallOnNonFunction { item, base } => {
+        Error::CallOnNonFunction { item: _, base } => {
             let prim =
                 Label::primary(base.file, base.range()).with_message("not a callable expression");
-            let sec =
-                Label::secondary(item.file, item.range()).with_message("invalid function call");
             Diagnostic::error()
                 .with_message("function call on a non-callable value")
-                .with_labels(vec![prim, sec])
+                .with_labels(vec![prim])
         }
         Error::TypeConstructorInInvalidPosition { where_ } => {
             let prim = Label::primary(where_.file, where_.range())

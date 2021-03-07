@@ -209,7 +209,7 @@ pub enum TokenKind {
     Dot,
 
     // Misc
-    #[regex(r"//.*\n", logos::skip)]
+    #[regex(r"//[^\n]*", logos::skip)]
     Comment,
     #[regex(r#"\s+"#, logos::skip)]
     Whitespace,
