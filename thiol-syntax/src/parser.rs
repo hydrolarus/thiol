@@ -200,7 +200,7 @@ peg::parser! {
                 Loc::new(start.merge(end), ast::TypeDefinitionRhs::Record { fields })
             }
         /   ty_ref:type_reference() [tok!(TK::SemiColon, end)] {
-                Loc::new(ty_ref.loc.merge(end), ast::TypeDefinitionRhs::Alias(ty_ref.value))
+                Loc::new(ty_ref.loc.merge(end), ast::TypeDefinitionRhs::Alias(ty_ref))
             }
 
 

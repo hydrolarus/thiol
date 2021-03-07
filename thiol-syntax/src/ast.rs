@@ -39,7 +39,7 @@ pub struct TypeDefinition {
 
 #[derive(Debug, Clone)]
 pub enum TypeDefinitionRhs {
-    Alias(TypeReference),
+    Alias(Loc<TypeReference>),
     Record { fields: Vec<Loc<VariableDef>> },
 }
 

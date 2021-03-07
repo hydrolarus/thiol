@@ -17,6 +17,10 @@ pub struct FileLocation {
 }
 
 impl FileLocation {
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.start..self.end
+    }
+
     pub fn merge(&self, other: FileLocation) -> Self {
         debug_assert_eq!(self.file, other.file);
         Self {

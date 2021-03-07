@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 [package]
-name = "thiolc"
+name = "thiol-ast-lowering"
 version = "0.1.0"
 authors = ["tiatomee <tia-github@poto.cafe>"]
 edition = "2018"
@@ -13,11 +13,4 @@ edition = "2018"
 [dependencies]
 thiol-syntax = { path = "../thiol-syntax" }
 thiol-hir = { path = "../thiol-hir" }
-thiol-ast-lowering = { path = "../thiol-ast-lowering" }
-
-anyhow = "1"
-clap = "3.0.0-beta.2"
-codespan-reporting = "0.11"
-
-[dev-dependencies]
-goldentests = "0.3"
+id-arena = "2"

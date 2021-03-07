@@ -11,7 +11,9 @@ A programming language that helps you write shader- and kernel-programs.
 **Status:**
 
 - [x] parsing to AST
-- [ ] convert to HIR and type check
+- [x] convert to HIR
+- [ ] type check HIR
+- [ ] generate MIR
 - [ ] code generation
   - [ ] SPIR-V
   - [ ] GLSL

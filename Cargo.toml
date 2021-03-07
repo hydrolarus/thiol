@@ -4,6 +4,7 @@
 
 [workspace]
 members = [
+    "thiol-ast-lowering",
     "thiol-hir",
     "thiol-syntax",
     "thiolc"

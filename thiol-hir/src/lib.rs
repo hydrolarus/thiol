@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use id_arena::{Arena, Id};
 
-use thiol_syntax::FileLocation;
+pub use thiol_syntax::FileLocation;
 
 pub type Identifier = String;
 
@@ -14,6 +14,7 @@ pub type Identifier = String;
 pub struct Context {
     pub identifiers: Arena<Identifier>,
     pub type_defs: Arena<TypeDefinition>,
+    pub type_def_rhss: Arena<TypeDefinitionRhs>,
     pub type_refs: Arena<TypeReference>,
     pub functions: Arena<Function>,
     pub programs: Arena<Program>,
@@ -22,9 +23,11 @@ pub struct Context {
     pub statements: Arena<Statement>,
     pub expressions: Arena<Expression>,
     pub prim_ops: Arena<PrimitiveOp>,
+    pub vec_types: Arena<VecType>,
 
     pub identifier_fcs: HashMap<Id<Identifier>, FileLocation>,
     pub type_def_fcs: HashMap<Id<TypeDefinition>, FileLocation>,
+    pub type_def_rhs_fcs: HashMap<Id<TypeDefinitionRhs>, FileLocation>,
     pub type_ref_fcs: HashMap<Id<TypeReference>, FileLocation>,
     pub function_fcs: HashMap<Id<Function>, FileLocation>,
     pub program_fcs: HashMap<Id<Program>, FileLocation>,
@@ -33,9 +36,10 @@ pub struct Context {
     pub statement_fcs: HashMap<Id<Statement>, FileLocation>,
     pub expression_fcs: HashMap<Id<Expression>, FileLocation>,
     pub prim_op_fcs: HashMap<Id<PrimitiveOp>, FileLocation>,
+    pub vec_type_fcs: HashMap<Id<VecType>, FileLocation>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Module {
     pub types: Vec<Id<TypeDefinition>>,
     pub consts: Vec<Id<VariableDef>>,
@@ -121,7 +125,7 @@ pub enum ForLoopType {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Literal(Id<Literal>),
+    Literal(Literal),
     Variable(Id<Identifier>),
     PrimitiveOp(Id<PrimitiveOp>),
     Call {
