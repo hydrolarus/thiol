@@ -230,14 +230,14 @@ pub enum PrimitiveType {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum VecType {
     Point,
     Vector,
     Colour,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum VecSize {
     VS2,
     VS3,

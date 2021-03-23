@@ -531,7 +531,7 @@ peg::parser! {
             }
         /   [tok!(TK::Array, al)] [tok!(TK::BracketOpen)]
                 [tok!(TK::Integer(size), sl)]
-            [tok!(TK::BracketOpen)] [tok!(TK::Of)] ty:type_reference() {
+            [tok!(TK::BracketClose)] [tok!(TK::Of)] ty:type_reference() {
                 Loc::new(
                     al.merge(ty.loc),
                     ast::TypeReference::Array {

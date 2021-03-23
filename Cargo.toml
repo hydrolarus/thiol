@@ -7,5 +7,6 @@ members = [
     "thiol-ast-lowering",
     "thiol-hir",
     "thiol-syntax",
+    "thiol-typeck",
     "thiolc"
 ]
