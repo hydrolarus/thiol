@@ -21,6 +21,12 @@ pub struct FunctionSig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypeRepr {
+    pub distinct_id: usize,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
     Bool,
     Int,

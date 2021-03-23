@@ -32,7 +32,7 @@ impl<'a> TypePrinter<'a> {
     fn print_type(&self, id: ty::TypeId) -> Doc {
         let type_ = self.ty.types.get_by_right(&id).unwrap();
 
-        let doc = match type_ {
+        let doc = match &type_.ty {
             ty::Type::Bool => Doc::text("bool"),
             ty::Type::Int => Doc::text("int"),
             ty::Type::UInt => Doc::text("uint"),
