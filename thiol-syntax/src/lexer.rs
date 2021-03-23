@@ -18,6 +18,9 @@ pub enum TokenKind {
     #[token("record")]
     Record,
 
+    #[token("distinct")]
+    Distinct,
+
     #[token("array")]
     Array,
 

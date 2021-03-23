@@ -135,6 +135,9 @@ impl<'a> Translator<'a> {
 
     fn type_definition(&mut self, t: &Loc<ast::TypeDefinition>) -> Result<Id<hir::TypeDefinition>> {
         let rhs = match &t.value.rhs.value {
+            ast::TypeDefinitionRhs::Distinct(ty) => {
+                hir::TypeDefinitionRhs::Distinct(self.type_reference(ty))
+            }
             ast::TypeDefinitionRhs::Alias(ty) => {
                 hir::TypeDefinitionRhs::Alias(self.type_reference(ty))
             }

@@ -208,6 +208,19 @@ impl Context {
         // already be translated (instead of only validated)
         if def.generics.is_empty() {
             let ty_id = match &ctx.type_def_rhss[def.rhs] {
+                hir::TypeDefinitionRhs::Distinct(id) => {
+                    let distinct_id = self.next_distinct_id();
+                    self.def_distinct_ids.insert(name.clone(), distinct_id);
+
+                    let alias_id = self
+                        .ty_ref(ctx, *id, &Default::default())
+                        .map_err(|err| vec![err])?;
+
+                    let mut alias_repr = self.types.get_by_right(&alias_id).unwrap().clone();
+                    alias_repr.distinct_id = distinct_id;
+
+                    self.add_type(alias_repr)
+                }
                 hir::TypeDefinitionRhs::Alias(id) => self
                     .ty_ref(ctx, *id, &Default::default())
                     .map_err(|err| vec![err])?,
@@ -265,6 +278,14 @@ impl Context {
 
             let mut errs = vec![];
             match &ctx.type_def_rhss[def.rhs] {
+                hir::TypeDefinitionRhs::Distinct(id) => {
+                    let distinct_id = self.next_distinct_id();
+                    self.def_distinct_ids.insert(name.clone(), distinct_id);
+
+                    if let Err(err) = self.ty_validate_ref(ctx, *id, &generics) {
+                        errs.push(err);
+                    }
+                }
                 hir::TypeDefinitionRhs::Alias(id) => {
                     if let Err(err) = self.ty_validate_ref(ctx, *id, &generics) {
                         errs.push(err);
@@ -357,14 +378,12 @@ impl Context {
                     .collect();
 
                 match &ctx.type_def_rhss[def.rhs] {
-                    /*
                     hir::TypeDefinitionRhs::Distinct(id) => {
                         let id = self.ty_ref(ctx, *id, &subst)?;
-                        let mut ty_repr = self.types.get_by_right(&id).unwrap();
-                        ty_repr.distinct_id = self.def_distinct_nums[name];
-                        self.add_or_get_type(ty_repr)
+                        let mut ty_repr = self.types.get_by_right(&id).unwrap().clone();
+                        ty_repr.distinct_id = self.def_distinct_ids[name];
+                        Ok(self.add_or_get_type(ty_repr))
                     }
-                    */
                     hir::TypeDefinitionRhs::Alias(id) => self.ty_ref(ctx, *id, &subst),
                     hir::TypeDefinitionRhs::Record { fields } => {
                         let distinct_id = self.def_distinct_ids[name];
@@ -589,6 +608,9 @@ fn type_def_deps<'a>(
 
     let rhs = &ctx.type_def_rhss[ty.rhs];
     match rhs {
+        hir::TypeDefinitionRhs::Distinct(ty) => {
+            type_ref_deps(ctx, *ty, deps);
+        }
         hir::TypeDefinitionRhs::Alias(ty) => {
             type_ref_deps(ctx, *ty, deps);
         }

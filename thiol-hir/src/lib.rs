@@ -56,6 +56,7 @@ pub struct TypeDefinition {
 
 #[derive(Debug, Clone)]
 pub enum TypeDefinitionRhs {
+    Distinct(Id<TypeReference>),
     Alias(Id<TypeReference>),
     Record { fields: Vec<Id<VariableDef>> },
 }
