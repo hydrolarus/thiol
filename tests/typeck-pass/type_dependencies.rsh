@@ -28,16 +28,16 @@ type
 // expected stdout:
 // A = (0) record  end
 // B = (0) record  end
-// C = (2) record
-//     is_some : (1) bool
+// C = (1) record
+//     is_some : bool
 //     value : (0) record  end
 // end
-// Vertex = (7) record
-//     position : (3) float4[Point]{ObjectSpace}
-//     colour : (4) float4[Colour]{Linear}
-//     uv : (5) float2[Vector]{UV}
-//     additional : (6) record
-//         first : (1) bool
-//         second : (1) bool
+// Vertex = (3) record
+//     position : float4[Point]{ObjectSpace}
+//     colour : float4[Colour]{Linear}
+//     uv : float2[Vector]{UV}
+//     additional : (2) record
+//         first : bool
+//         second : bool
 //     end
 // end

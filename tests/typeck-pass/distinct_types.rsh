@@ -14,14 +14,23 @@ type
     S = record end
     T = S;
 
+    Wrap<T> = distinct T;
+    X = Wrap<int>;
+    Y = Wrap<C>;
+    Z = Wrap<E>;
+
+
 // args: --dump-type-context
 //
 // expected stdout:
-// A = (0) int
-// B = (0) int
-// C = (1) int
-// D = (1) int
-// E = (2) int
-// R = (3) record  end
-// S = (4) record  end
-// T = (4) record  end
+// A = int
+// B = int
+// C = (0) int
+// D = (0) int
+// E = (1) int
+// R = (2) record  end
+// S = (3) record  end
+// T = (3) record  end
+// X = (4) int
+// Y = (4) (0) int
+// Z = (4) (1) int

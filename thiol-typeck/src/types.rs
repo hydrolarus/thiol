@@ -21,12 +21,6 @@ pub struct FunctionSig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TypeRepr {
-    pub distinct_id: usize,
-    pub ty: Type,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
     Bool,
     Int,
@@ -80,6 +74,11 @@ pub enum Type {
 
     Record {
         fields: Vec<(Identifier, TypeId)>,
+    },
+
+    Distinct {
+        distinct_id: usize,
+        inner: TypeId,
     },
 }
 

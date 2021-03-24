@@ -32,7 +32,7 @@ impl<'a> TypePrinter<'a> {
     fn print_type(&self, id: ty::TypeId) -> Doc {
         let type_ = self.ty.types.get_by_right(&id).unwrap();
 
-        let doc = match &type_.ty {
+        match &type_ {
             ty::Type::Bool => Doc::text("bool"),
             ty::Type::Int => Doc::text("int"),
             ty::Type::UInt => Doc::text("uint"),
@@ -152,9 +152,10 @@ impl<'a> TypePrinter<'a> {
                     .append("end")
                     .group()
             }
-        };
-
-        Doc::text(format!("({}) ", id.as_usize())).append(doc)
+            ty::Type::Distinct { distinct_id, inner } => {
+                Doc::text(format!("({}) ", distinct_id)).append(self.print_type(*inner))
+            }
+        }
     }
 }
 

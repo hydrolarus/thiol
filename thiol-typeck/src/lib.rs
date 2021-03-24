@@ -162,13 +162,13 @@ pub fn type_check(
 #[derive(Clone)]
 pub struct Context {
     pub defs: BTreeMap<Identifier, Id<TypeDefinition>>,
-    pub def_distinct_ids: BTreeMap<Identifier, usize>,
+    pub generic_distinct_ids: BTreeMap<Identifier, usize>,
 
     // generic types are *incomplete* before they are applied, but
     // non generic types will be able to be mapped directly to a type
     pub complete_types: BTreeMap<Identifier, TypeId>,
 
-    pub types: BiBTreeMap<TypeRepr, TypeId>,
+    pub types: BiBTreeMap<Type, TypeId>,
     pub distinct_counter: usize,
 }
 
@@ -176,11 +176,11 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             defs: Default::default(),
-            def_distinct_ids: Default::default(),
+            generic_distinct_ids: Default::default(),
             complete_types: Default::default(),
 
             types: Default::default(),
-            distinct_counter: 1,
+            distinct_counter: 0,
         }
     }
 }
@@ -209,25 +209,20 @@ impl Context {
         if def.generics.is_empty() {
             let ty_id = match &ctx.type_def_rhss[def.rhs] {
                 hir::TypeDefinitionRhs::Distinct(id) => {
-                    let distinct_id = self.next_distinct_id();
-                    self.def_distinct_ids.insert(name.clone(), distinct_id);
-
                     let alias_id = self
                         .ty_ref(ctx, *id, &Default::default())
                         .map_err(|err| vec![err])?;
 
-                    let mut alias_repr = self.types.get_by_right(&alias_id).unwrap().clone();
-                    alias_repr.distinct_id = distinct_id;
-
-                    self.add_type(alias_repr)
+                    let distinct_id = self.next_distinct_id();
+                    self.add_type(Type::Distinct {
+                        distinct_id,
+                        inner: alias_id,
+                    })
                 }
                 hir::TypeDefinitionRhs::Alias(id) => self
                     .ty_ref(ctx, *id, &Default::default())
                     .map_err(|err| vec![err])?,
                 hir::TypeDefinitionRhs::Record { fields: field_ids } => {
-                    let distinct_id = self.next_distinct_id();
-                    self.def_distinct_ids.insert(name.clone(), distinct_id);
-
                     let mut errs = vec![];
                     let mut fields_so_far = HashMap::new();
 
@@ -260,10 +255,9 @@ impl Context {
                         return Err(errs);
                     }
 
-                    self.add_type(TypeRepr {
-                        distinct_id,
-                        ty: Type::Record { fields },
-                    })
+                    let inner = self.add_or_get_type(Type::Record { fields });
+                    let distinct_id = self.next_distinct_id();
+                    self.add_type(Type::Distinct { distinct_id, inner })
                 }
             };
             let old = self.complete_types.insert(name.clone(), ty_id);
@@ -279,12 +273,12 @@ impl Context {
             let mut errs = vec![];
             match &ctx.type_def_rhss[def.rhs] {
                 hir::TypeDefinitionRhs::Distinct(id) => {
-                    let distinct_id = self.next_distinct_id();
-                    self.def_distinct_ids.insert(name.clone(), distinct_id);
-
                     if let Err(err) = self.ty_validate_ref(ctx, *id, &generics) {
                         errs.push(err);
                     }
+
+                    let distinct_id = self.next_distinct_id();
+                    self.generic_distinct_ids.insert(name.clone(), distinct_id);
                 }
                 hir::TypeDefinitionRhs::Alias(id) => {
                     if let Err(err) = self.ty_validate_ref(ctx, *id, &generics) {
@@ -292,9 +286,6 @@ impl Context {
                     }
                 }
                 hir::TypeDefinitionRhs::Record { fields } => {
-                    let distinct_id = self.next_distinct_id();
-                    self.def_distinct_ids.insert(name.clone(), distinct_id);
-
                     let mut fields_so_far = HashMap::new();
 
                     for field in fields {
@@ -314,6 +305,9 @@ impl Context {
                             errs.push(err);
                         }
                     }
+
+                    let distinct_id = self.next_distinct_id();
+                    self.generic_distinct_ids.insert(name.clone(), distinct_id);
                 }
             }
             if errs.is_empty() {
@@ -324,7 +318,7 @@ impl Context {
         }
     }
 
-    fn add_type(&mut self, ty: TypeRepr) -> TypeId {
+    fn add_type(&mut self, ty: Type) -> TypeId {
         let next_id = TypeId(self.types.len());
 
         let res = self.types.insert(ty, next_id);
@@ -332,7 +326,7 @@ impl Context {
         next_id
     }
 
-    fn add_or_get_type(&mut self, ty: TypeRepr) -> TypeId {
+    fn add_or_get_type(&mut self, ty: Type) -> TypeId {
         if let Some(id) = self.types.get_by_left(&ty) {
             *id
         } else {
@@ -379,14 +373,13 @@ impl Context {
 
                 match &ctx.type_def_rhss[def.rhs] {
                     hir::TypeDefinitionRhs::Distinct(id) => {
-                        let id = self.ty_ref(ctx, *id, &subst)?;
-                        let mut ty_repr = self.types.get_by_right(&id).unwrap().clone();
-                        ty_repr.distinct_id = self.def_distinct_ids[name];
-                        Ok(self.add_or_get_type(ty_repr))
+                        let inner = self.ty_ref(ctx, *id, &subst)?;
+                        let distinct_id = self.generic_distinct_ids[name];
+                        Ok(self.add_or_get_type(Type::Distinct { distinct_id, inner }))
                     }
                     hir::TypeDefinitionRhs::Alias(id) => self.ty_ref(ctx, *id, &subst),
                     hir::TypeDefinitionRhs::Record { fields } => {
-                        let distinct_id = self.def_distinct_ids[name];
+                        let distinct_id = self.generic_distinct_ids[name];
                         let mut record_fields = Vec::with_capacity(fields.len());
                         for field in fields {
                             let def = &ctx.variable_defs[*field];
@@ -394,12 +387,12 @@ impl Context {
                             let field_ty = self.ty_ref(ctx, def.type_, &subst)?;
                             record_fields.push((name, field_ty));
                         }
-                        Ok(self.add_or_get_type(TypeRepr {
-                            distinct_id,
-                            ty: Type::Record {
-                                fields: record_fields,
-                            },
-                        }))
+
+                        let inner = self.add_or_get_type(Type::Record {
+                            fields: record_fields,
+                        });
+
+                        Ok(self.add_or_get_type(Type::Distinct { distinct_id, inner }))
                     }
                 }
             }
@@ -526,7 +519,7 @@ impl Context {
             }
         };
 
-        Ok(self.add_or_get_type(TypeRepr { distinct_id: 0, ty }))
+        Ok(self.add_or_get_type(ty))
     }
 
     /// Validate a type reference
