@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use hir::{FileLocation, Identifier, TypeDefinition};
+use hir::{Expression, FileLocation, Function, Identifier, TypeDefinition, VariableDef};
 use thiol_hir::{self as hir, TypeReference};
 
 use bimap::BiBTreeMap;
@@ -55,12 +55,78 @@ pub enum Error {
         redefinition_name: FileLocation,
         item: FileLocation,
     },
+
+    FunctionRedefinition {
+        previous_name: FileLocation,
+        previous_sig: FileLocation,
+        redefinition_name: FileLocation,
+        redefinition_sig: FileLocation,
+    },
+    ConstantRedefinition {
+        previous_name: FileLocation,
+        previous_def: FileLocation,
+        redefinition_name: FileLocation,
+        redefinition_def: FileLocation,
+    },
 }
 
 pub fn type_check(
     ty_ctx: &mut Context,
     hir_ctx: &hir::Context,
     module: &hir::Module,
+) -> Result<(), Vec<Error>> {
+    process_type_definitions(module, ty_ctx, hir_ctx)?;
+
+    add_function_signatures(module, ty_ctx, hir_ctx)?;
+
+    add_constants(module, ty_ctx, hir_ctx)?;
+
+    Ok(())
+}
+
+fn add_constants(
+    module: &hir::Module,
+    ty_ctx: &mut Context,
+    hir_ctx: &hir::Context,
+) -> Result<(), Vec<Error>> {
+    let mut errs = vec![];
+
+    for c in &module.consts {
+        if let Err(err) = ty_ctx.add_constant(hir_ctx, *c) {
+            errs.push(err);
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        Err(errs)
+    }
+}
+
+fn add_function_signatures(
+    module: &hir::Module,
+    ty_ctx: &mut Context,
+    hir_ctx: &hir::Context,
+) -> Result<(), Vec<Error>> {
+    let mut errors = vec![];
+    for func in &module.functions {
+        if let Err(err) = ty_ctx.add_function_signature(hir_ctx, *func) {
+            errors.push(err);
+        }
+    }
+
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(())
+    }
+}
+
+fn process_type_definitions(
+    module: &hir::Module,
+    ty_ctx: &mut Context,
+    hir_ctx: &hir::Context,
 ) -> Result<(), Vec<Error>> {
     let mut errs = vec![];
 
@@ -159,7 +225,7 @@ pub fn type_check(
     }
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct Context {
     pub defs: BTreeMap<Identifier, Id<TypeDefinition>>,
     pub generic_distinct_ids: BTreeMap<Identifier, usize>,
@@ -170,26 +236,128 @@ pub struct Context {
 
     pub types: BiBTreeMap<Type, TypeId>,
     pub distinct_counter: usize,
-}
 
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            defs: Default::default(),
-            generic_distinct_ids: Default::default(),
-            complete_types: Default::default(),
-
-            types: Default::default(),
-            distinct_counter: 0,
-        }
-    }
+    pub function_sigs: BTreeMap<Identifier, FunctionSig>,
+    pub consts: BTreeMap<Identifier, ConstantSig>,
 }
 
 impl Context {
-    fn next_distinct_id(&mut self) -> usize {
-        let id = self.distinct_counter;
-        self.distinct_counter += 1;
-        id
+    fn ty_ref(
+        &mut self,
+        ctx: &hir::Context,
+        id: Id<TypeReference>,
+        subst: &HashMap<&str, TypeId>,
+    ) -> Result<TypeId, Error> {
+        use hir::PrimitiveType as PT;
+        use TypeReference as TR;
+
+        let ty_ref = &ctx.type_refs[id];
+
+        let ty = match ty_ref {
+            TR::Primitive(prim) => match prim {
+                PT::Bool => Type::Bool,
+                PT::Int => Type::Int,
+                PT::UInt => Type::UInt,
+                PT::Float => Type::Float,
+                PT::Double => Type::Double,
+                PT::BoolVec { components } => Type::BoolVec {
+                    components: (*components).into(),
+                },
+                PT::IntVec {
+                    components,
+                    vtype,
+                    space,
+                } => Type::IntVec {
+                    components: (*components).into(),
+                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
+                    space: space.map(|id| ctx.identifiers[id].clone()),
+                },
+                PT::UIntVec {
+                    components,
+                    vtype,
+                    space,
+                } => Type::UIntVec {
+                    components: (*components).into(),
+                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
+                    space: space.map(|id| ctx.identifiers[id].clone()),
+                },
+                PT::FloatVec {
+                    components,
+                    vtype,
+                    space,
+                } => Type::FloatVec {
+                    components: (*components).into(),
+                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
+                    space: space.map(|id| ctx.identifiers[id].clone()),
+                },
+                PT::DoubleVec {
+                    components,
+                    vtype,
+                    space,
+                } => Type::DoubleVec {
+                    components: (*components).into(),
+                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
+                    space: space.map(|id| ctx.identifiers[id].clone()),
+                },
+                PT::FloatMat {
+                    cols,
+                    rows,
+                    transform,
+                } => Type::FloatMat {
+                    cols: (*cols).into(),
+                    rows: (*rows).into(),
+                    transform: transform.map(|(from, to)| {
+                        (ctx.identifiers[from].clone(), ctx.identifiers[to].clone())
+                    }),
+                },
+                PT::DoubleMat {
+                    cols,
+                    rows,
+                    transform,
+                } => Type::DoubleMat {
+                    cols: (*cols).into(),
+                    rows: (*rows).into(),
+                    transform: transform.map(|(from, to)| {
+                        (ctx.identifiers[from].clone(), ctx.identifiers[to].clone())
+                    }),
+                },
+            },
+            TR::OpenArray(inner) => {
+                let inner_id = self.ty_ref(ctx, *inner, subst)?;
+                Type::OpenArray { base: inner_id }
+            }
+            TR::Array { base, size } => {
+                let inner_id = self.ty_ref(ctx, *base, subst)?;
+                Type::Array {
+                    base: inner_id,
+                    size: *size,
+                }
+            }
+            TR::Named { name, generics } => {
+                let loc = ctx.type_ref_fcs[&id];
+                let mut gens = Vec::with_capacity(generics.len());
+                for id in generics {
+                    let id: TypeId = self.ty_ref(ctx, *id, subst)?;
+                    gens.push(id);
+                }
+
+                let name = &ctx.identifiers[*name];
+
+                if let Some(subst_id) = subst.get(name.as_str()) {
+                    if !gens.is_empty() {
+                        return Err(Error::HigherKindedGenericTypeUsed {
+                            generic_name: name.clone(),
+                            loc,
+                        });
+                    }
+                    return Ok(*subst_id);
+                } else {
+                    return self.ty_named(ctx, loc, name, &gens);
+                }
+            }
+        };
+
+        Ok(self.add_or_get_type(ty))
     }
 
     fn add_type_definition(
@@ -318,6 +486,115 @@ impl Context {
         }
     }
 
+    fn add_function_signature(
+        &mut self,
+        ctx: &hir::Context,
+        func: Id<Function>,
+    ) -> Result<(), Error> {
+        let fun = &ctx.functions[func];
+
+        let ret = self.ty_ref(ctx, fun.ret_type, &Default::default())?;
+
+        let args = fun
+            .args
+            .iter()
+            .map(|(nam, ty)| {
+                let ident = ctx.identifiers[*nam].clone();
+                let ty = self.ty_ref(ctx, *ty, &Default::default())?;
+                Ok((ident, ty))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let sig = FunctionSig {
+            func_id: func,
+            args,
+            ret,
+        };
+        let name = ctx.identifiers[fun.name].clone();
+
+        use std::collections::btree_map::Entry;
+        match self.function_sigs.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(sig);
+                Ok(())
+            }
+            Entry::Occupied(entry) => {
+                let prev_id = entry.get().func_id;
+                let prev_func = &ctx.functions[prev_id];
+                let prev_item_fc = ctx.function_fcs[&prev_id];
+                let prev_name_fc = ctx.identifier_fcs[&prev_func.name];
+
+                let redef_item_fc = ctx.function_fcs[&func];
+                let redef_name_fc = ctx.identifier_fcs[&fun.name];
+
+                Err(Error::FunctionRedefinition {
+                    previous_name: prev_name_fc,
+                    previous_sig: prev_item_fc,
+                    redefinition_name: redef_name_fc,
+                    redefinition_sig: redef_item_fc,
+                })
+            }
+        }
+    }
+
+    fn add_constant(&mut self, hir_ctx: &hir::Context, id: Id<VariableDef>) -> Result<(), Error> {
+        let def = &hir_ctx.variable_defs[id];
+        let name = &hir_ctx.identifiers[def.name];
+
+        let ty = self.ty_ref(hir_ctx, def.type_, &Default::default())?;
+
+        match self.consts.entry(name.clone()) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(ConstantSig {
+                    const_id: id,
+                    type_: ty,
+                });
+                Ok(())
+            }
+            std::collections::btree_map::Entry::Occupied(entry) => {
+                let prev_sig = entry.get();
+                let prev = &hir_ctx.variable_defs[prev_sig.const_id];
+
+                let redef_name = hir_ctx.identifier_fcs[&def.name];
+                let redef_def = hir_ctx.variable_def_fcs[&id];
+
+                let prev_name = hir_ctx.identifier_fcs[&prev.name];
+                let prev_def = hir_ctx.variable_def_fcs[&prev_sig.const_id];
+
+                Err(Error::ConstantRedefinition {
+                    previous_def: prev_def,
+                    previous_name: prev_name,
+
+                    redefinition_def: redef_def,
+                    redefinition_name: redef_name,
+                })
+            }
+        }
+    }
+
+    #[allow(dead_code, unused_variables)]
+    fn check_expression(
+        &mut self,
+        ctx: &hir::Context,
+        expr: Id<Expression>,
+        ty: &Type,
+    ) -> Result<(), Error> {
+        match &ctx.expressions[expr] {
+            Expression::Literal(_) => {}
+            Expression::Variable(_) => {}
+            Expression::PrimitiveOp(_) => {}
+            Expression::Call {
+                name,
+                pos_args,
+                nam_args,
+            } => {}
+            Expression::Field { base, name } => {}
+            Expression::Index { base, index } => {}
+            Expression::As { base, ty } => {}
+        }
+        todo!()
+    }
+
     fn add_type(&mut self, ty: Type) -> TypeId {
         let next_id = TypeId(self.types.len());
 
@@ -404,124 +681,6 @@ impl Context {
         }
     }
 
-    fn ty_ref(
-        &mut self,
-        ctx: &hir::Context,
-        id: Id<TypeReference>,
-        subst: &HashMap<&str, TypeId>,
-    ) -> Result<TypeId, Error> {
-        use hir::PrimitiveType as PT;
-        use TypeReference as TR;
-
-        let ty_ref = &ctx.type_refs[id];
-
-        let ty = match ty_ref {
-            TR::Primitive(prim) => match prim {
-                PT::Bool => Type::Bool,
-                PT::Int => Type::Int,
-                PT::UInt => Type::UInt,
-                PT::Float => Type::Float,
-                PT::Double => Type::Double,
-                PT::BoolVec { components } => Type::BoolVec {
-                    components: (*components).into(),
-                },
-                PT::IntVec {
-                    components,
-                    vtype,
-                    space,
-                } => Type::IntVec {
-                    components: (*components).into(),
-                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
-                    space: space.map(|id| ctx.identifiers[id].clone()),
-                },
-                PT::UIntVec {
-                    components,
-                    vtype,
-                    space,
-                } => Type::UIntVec {
-                    components: (*components).into(),
-                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
-                    space: space.map(|id| ctx.identifiers[id].clone()),
-                },
-                PT::FloatVec {
-                    components,
-                    vtype,
-                    space,
-                } => Type::FloatVec {
-                    components: (*components).into(),
-                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
-                    space: space.map(|id| ctx.identifiers[id].clone()),
-                },
-                PT::DoubleVec {
-                    components,
-                    vtype,
-                    space,
-                } => Type::DoubleVec {
-                    components: (*components).into(),
-                    vtype: vtype.map(|ty| ctx.vec_types[ty]).into(),
-                    space: space.map(|id| ctx.identifiers[id].clone()),
-                },
-                PT::FloatMat {
-                    cols,
-                    rows,
-                    transform,
-                } => Type::FloatMat {
-                    cols: (*cols).into(),
-                    rows: (*rows).into(),
-                    transform: transform.map(|(from, to)| {
-                        (ctx.identifiers[from].clone(), ctx.identifiers[to].clone())
-                    }),
-                },
-                PT::DoubleMat {
-                    cols,
-                    rows,
-                    transform,
-                } => Type::DoubleMat {
-                    cols: (*cols).into(),
-                    rows: (*rows).into(),
-                    transform: transform.map(|(from, to)| {
-                        (ctx.identifiers[from].clone(), ctx.identifiers[to].clone())
-                    }),
-                },
-            },
-            TR::OpenArray(inner) => {
-                let inner_id = self.ty_ref(ctx, *inner, subst)?;
-                Type::OpenArray { base: inner_id }
-            }
-            TR::Array { base, size } => {
-                let inner_id = self.ty_ref(ctx, *base, subst)?;
-                Type::Array {
-                    base: inner_id,
-                    size: *size,
-                }
-            }
-            TR::Named { name, generics } => {
-                let loc = ctx.type_ref_fcs[&id];
-                let mut gens = Vec::with_capacity(generics.len());
-                for id in generics {
-                    let id: TypeId = self.ty_ref(ctx, *id, subst)?;
-                    gens.push(id);
-                }
-
-                let name = &ctx.identifiers[*name];
-
-                if let Some(subst_id) = subst.get(name.as_str()) {
-                    if !gens.is_empty() {
-                        return Err(Error::HigherKindedGenericTypeUsed {
-                            generic_name: name.clone(),
-                            loc,
-                        });
-                    }
-                    return Ok(*subst_id);
-                } else {
-                    return self.ty_named(ctx, loc, name, &gens);
-                }
-            }
-        };
-
-        Ok(self.add_or_get_type(ty))
-    }
-
     /// Validate a type reference
     ///
     /// Used to check that a type definition is valid without having to instantiate
@@ -577,6 +736,12 @@ impl Context {
                 }
             }
         }
+    }
+
+    fn next_distinct_id(&mut self) -> usize {
+        let id = self.distinct_counter;
+        self.distinct_counter += 1;
+        id
     }
 }
 

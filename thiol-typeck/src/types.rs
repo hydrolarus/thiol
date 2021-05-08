@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-use thiol_hir::Identifier;
+use id_arena::Id;
+use thiol_hir::{self as hir, Identifier};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeId(pub(crate) usize);
@@ -16,8 +17,15 @@ impl TypeId {
 
 #[derive(Debug, Clone)]
 pub struct FunctionSig {
+    pub func_id: Id<hir::Function>,
     pub args: Vec<(Identifier, TypeId)>,
     pub ret: TypeId,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstantSig {
+    pub const_id: Id<hir::VariableDef>,
+    pub type_: TypeId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

@@ -304,5 +304,41 @@ fn typeck_error_to_diag(err: thiol_typeck::Error) -> Diagnostic<FileId> {
                 .with_message("generic parameter redefinition")
                 .with_labels(labels)
         }
+        thiol_typeck::Error::FunctionRedefinition {
+            previous_name,
+            previous_sig,
+            redefinition_name,
+            redefinition_sig,
+        } => {
+            let labels = vec![
+                Label::primary(redefinition_name.file, redefinition_name.range())
+                    .with_message("redefinition of function"),
+                Label::secondary(redefinition_sig.file, redefinition_sig.range()),
+                Label::secondary(previous_name.file, previous_name.range())
+                    .with_message("previous definition of function with the same name"),
+                Label::secondary(previous_sig.file, previous_sig.range()),
+            ];
+            Diagnostic::error()
+                .with_message("function redefinition")
+                .with_labels(labels)
+        }
+        thiol_typeck::Error::ConstantRedefinition {
+            previous_name,
+            previous_def,
+            redefinition_name,
+            redefinition_def,
+        } => {
+            let labels = vec![
+                Label::primary(redefinition_name.file, redefinition_name.range())
+                    .with_message("redefinition of constant"),
+                Label::secondary(redefinition_def.file, redefinition_def.range()),
+                Label::secondary(previous_name.file, previous_name.range())
+                    .with_message("previous definition of constant with the same name"),
+                Label::secondary(previous_def.file, previous_def.range()),
+            ];
+            Diagnostic::error()
+                .with_message("constant redefinition")
+                .with_labels(labels)
+        }
     }
 }

@@ -1,9 +1,14 @@
 // args: --parse-only
 
 const
-    WATER_COLOUR: float3 := float3(0, 117 / 255, 242 / 255);
+    WATER_COLOUR: float3 is Colour := float3(0, 117 / 255, 242 / 255);
     Z_NEAR: float := 10;
     Z_FAR: float := 400;
+
+// std stubs for now
+type
+    Texture<C> = record end
+    Sampler<C> = record end
 
 type
     Uniforms = record
@@ -41,14 +46,14 @@ input
     frag_coord: float4;
 
     [Location(0)]
-    water_screen_pos: float2;
+    water_screen_pos: float2 is Point;
     [Location(1)]
     fresnel: float;
     [Location(2)]
-    light: float3;
+    light: float3 is Colour;
 output
     [Location(0)]
-    colour: float4;
+    colour: float4 is Colour;
 begin
     var reflection_colour: float3;
     reflection_colour := REFLECTION.sample(COLOUR_SAMPLER, water_screen_pos).xyz;
